@@ -1,0 +1,179 @@
+<html>
+    <center>
+        <canvas id=canvas width=400 height=400></canvas>
+        <script>
+        var canvas = document.querySelector('canvas');
+        var ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        var centrex = canvas.width/2;
+        var centrey = canvas.height/2;
+
+        var innerCircle = {color:      'red',
+                           radius:     canvas.height/2 - 70,
+                           x:          centrex,
+                           y:          centrey,
+                           lineWidth:  1};
+
+        var outerCircle = {color:      'black',
+                           radius:     canvas.height/2 - 40,
+                           x:          centrex,
+                           y:          centrey,
+                           lineWidth:  1,
+                           isDragging: false,
+                           rotation:   0};
+
+		var innerLine = {startx:    0,
+                         starty:    0,
+                         endx:      innerCircle.radius,
+                         endy:      0,
+                         lineWidth: 1};
+
+        var outerLine = {startx:    innerCircle.radius,
+                         starty:    0,
+                         endx:      outerCircle.radius,
+                         endy:      0,
+                         lineWidth: 1};
+
+        // Mouse handling variables
+        var mouseIsDown = false;
+        var lastX = 0;
+        var lastY = 0;
+        var offsetX = canvas.offsetLeft;
+        var offsetY = canvas.offsetTop;
+
+        function drawArc(ctx, circle) {
+            ctx.lineWidth   = circle.lineWidth;
+            ctx.strokeStyle = circle.color;
+            ctx.beginPath();
+            // Signature: void ctx.arc(x, y, radius, startAngle, endAngle [, anticlockwise]);
+            ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+            ctx.stroke()
+        }
+
+        function drawLine(ctx, line) {
+        	ctx.lineWidth   = line.lineWidth;
+            ctx.strokeStyle = 'black';
+            ctx.beginPath();
+            ctx.moveTo(line.startx, line.starty);
+            ctx.lineTo(line.endx, line.endy);
+            ctx.stroke();
+        }
+
+        function drawCircles(ctx) {
+            drawArc(ctx, innerCircle);
+            drawArc(ctx, outerCircle);
+        }
+
+        function drawLines(ctx, line, circle, rotation) {
+            for (x = 0; x < 12; x++) {
+                ctx.save();
+                ctx.translate(circle.x, circle.y)
+                ctx.rotate(rotation * Math.PI / 180);
+                drawLine(ctx, line);
+                ctx.restore();
+                rotation += 30;
+            }
+        }
+
+        function drawNumbers(ctx) {
+            var rotation = 195;
+
+            for (x = 0; x < 12; x++) {
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.save();
+                ctx.translate(innerCircle.x, innerCircle.y)
+                ctx.rotate(-rotation * Math.PI / 180);
+                ctx.translate(30, 0);
+                // We want the text to be rigth way up so unrotate
+                ctx.rotate(rotation * Math.PI / 180);
+                ctx.fillText((x + 1).toString(), 0, 0);
+                ctx.restore();
+                // Rotate to the next number position
+                rotation += 30;
+            }
+        }
+
+        function drawChart(ctx, rotation) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawCircles(ctx);
+    		drawLines(ctx, innerLine, innerCircle, 0);
+            drawLines(ctx, outerLine, outerCircle, rotation);
+            drawNumbers(ctx)
+        }
+
+        function handleMouseDown(e) {
+            lastX = parseInt(e.clientX - offsetX);
+            lastY = parseInt(e.clientY - offsetY);
+
+            var withinInnerCircle = false;
+            var withinOuterCircle = false;
+
+            var circle = innerCircle;
+            var dx = lastX - circle.x;
+            var dy = lastY - circle.y;
+            var rr = circle.radius * circle.radius;
+            if (dx * dx + dy * dy <= rr) {
+                withinInnerCircle = true;
+            }
+
+            circle = outerCircle;
+            var dx = lastX - circle.x;
+            var dy = lastY - circle.y;
+            var rr = circle.radius * circle.radius;
+            if (dx * dx + dy * dy <= rr) {
+                withinOuterCircle = true;
+            }
+
+            if (withinOuterCircle && !withinInnerCircle) {
+                mouseIsDown = true;
+            }
+        }
+
+        function handleMouseUp(e) {
+            mouseIsDown = false;
+            innerCircle.isDragging = false;
+            outerCircle.isDragging = false;
+        }
+
+        function handleMouseMove(e) {
+            if (!mouseIsDown) {
+                return;
+            }
+
+            mouseX = parseInt(e.clientX - offsetX);
+            mouseY = parseInt(e.clientY - offsetY);
+            var dragLengthX = mouseX - lastX;
+            var dragLengthY = mouseY - lastY;
+            // for (var i = 0; i < circles.length; i++) {
+            //     var circle = circles[i]
+            //     if (circle.isDragging) {
+            //         //circle.x += dragLengthX;
+            //         //circle.y += dragLengthY;
+            //     }
+            // }
+            lastX = mouseX;
+            lastY = mouseY;
+
+            // Define the rotation of the outer lines
+            // var rotation = lastX;
+
+            // From Ss site
+            radians = Math.atan2(mouseX - centrex, mouseY - centrey),
+            degree = Math.round((radians * (180 / Math.PI) * -1) + 100);
+
+            // drawChart(ctx, outerCircle.rotation += dragLengthX);
+            drawChart(ctx, degree);
+        }
+
+        canvas.onmousedown = handleMouseDown;
+        canvas.onmouseup =   handleMouseUp;
+        canvas.onmousemove = handleMouseMove;
+
+        drawChart(ctx, 0);
+
+        </script>
+    </center>
+</html>

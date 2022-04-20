@@ -1,1 +1,283 @@
-Hello World
+<html>
+    <center>
+        <canvas id=canvas width=400 height=400></canvas>
+        <script>
+        var canvas = document.querySelector('canvas');
+        var ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        var centrex = canvas.width/2;
+        var centrey = canvas.height/2;
+
+        var innerCircle = {color:      'red',
+                           radius:     canvas.height/2 - 70,
+                           x:          centrex,
+                           y:          centrey,
+                           lineWidth:  1};
+
+        var outerCircle = {color:      'black',
+                           radius:     canvas.height/2 - 40,
+                           x:          centrex,
+                           y:          centrey,
+                           lineWidth:  1,
+                           isDragging: false,
+                           rotation:   0};
+
+		var innerLine = {startx:    0,
+                         starty:    0,
+                         endx:      innerCircle.radius,
+                         endy:      0,
+                         lineWidth: 1};
+
+        var outerLine = {startx:    innerCircle.radius,
+                         starty:    0,
+                         endx:      outerCircle.radius,
+                         endy:      0,
+                         lineWidth: 1};
+
+        var currentAngleOfRingInDegrees = 0;
+
+        // An array to hold the loaded images to display on the canvas
+        var planetImgages = [];
+        var imageSize = 40;     // Would be better to actually rescale the actual images so there is no strange artifacts from the browser doing the resampling
+        // Planet image names, width, height, start positions and current positions that are updated when the image is dragged
+        var planetImageAttributes = [{name: 'Sun.png',                  width: imageSize, height:imageSize,     startX:0,     startY:10,   x:0,        y:10},
+                                     {name: 'Jupiter.png',              width: imageSize, height:imageSize,     startX:60,    startY:10,   x:60,       y:10},
+                                     {name: 'Pluto.png',                width: imageSize, height:imageSize,     startX:120,   startY:10,   x:120,      y:10},
+                                     {name: 'Lilith.png',               width: imageSize, height:imageSize,     startX:180,   startY:10,   x:180,      y:10},
+                                     {name: 'Moon.png',                 width: imageSize, height:imageSize,     startX:0,     startY:70,   x:0,        y:70},
+                                     {name: 'Saturn.png',               width: imageSize, height:imageSize,     startX:60,    startY:70,   x:60,       y:70},
+                                     {name: 'Chiron.png',               width: imageSize, height:imageSize,     startX:120,   startY:70,   x:120,      y:70},
+                                     {name: 'Ceres.png',                width: imageSize, height:imageSize,     startX:180,   startY:70,   x:180,      y:70},
+                                     {name: 'Mercury.png',              width: imageSize, height:imageSize,     startX:0,     startY:130,   x:0,       y:130},
+                                     {name: 'Uranus2.png',              width: imageSize, height:imageSize,     startX:60,    startY:130,   x:60,      y:130},
+                                     {name: 'NorthNode.png',            width: imageSize, height:imageSize,     startX:120,   startY:130,   x:120,     y:130},
+                                     {name: 'Pallas.png',               width: imageSize, height:imageSize,     startX:180,   startY:130,   x:180,     y:130},
+                                     {name: 'Venus.png',                width: imageSize, height:imageSize,     startX:0,     startY:190,   x:0,       y:190},
+                                     {name: 'Neptune.png',              width: imageSize, height:imageSize,     startX:60,    startY:190,   x:60,      y:190},
+                                     {name: 'SouthNode.png',            width: imageSize, height:imageSize,     startX:120,   startY:190,   x:120,     y:190},
+                                     {name: 'Juno.png',                 width: imageSize, height:imageSize,     startX:180,   startY:190,   x:180,     y:190},
+                                     {name: 'Mars.png',                 width: imageSize, height:imageSize,     startX:0,     startY:250,   x:0,       y:250},
+                                     {name: 'Pluto2.png',               width: imageSize, height:imageSize,     startX:60,    startY:250,   x:60,      y:250},
+                                     {name: 'blackmoonlilith.png',      width: imageSize, height:imageSize,     startX:120,   startY:250,   x:120,     y:250},
+                                     {name: 'Vesta.png',                width: imageSize, height:imageSize,     startX:180,   startY:250,   x:180,     y:250},
+                                     {name: 'Asc.png',                  width: imageSize, height:imageSize,     startX:0,     startY:310,   x:0,       y:310},
+                                     {name: 'Dsc.png',                  width: imageSize, height:imageSize,     startX:60,    startY:310,   x:60,      y:310},
+                                     {name: 'Mc.png',                   width: imageSize, height:imageSize,     startX:120,   startY:310,   x:120,     y:310},
+                                     {name: 'Ic.png',                   width: imageSize, height:imageSize,     startX:180,   startY:310,   x:180,     y:310},];
+
+        // Mouse handling variables
+        var isDraggingRing = false;
+        var draggingImage;  // Store the image currently being dragged
+        var lastX = 0;
+        var lastY = 0;
+        var offsetX = canvas.offsetLeft;
+        var offsetY = canvas.offsetTop;
+
+        function drawArc(ctx, circle) {
+            ctx.lineWidth   = circle.lineWidth;
+            ctx.strokeStyle = circle.color;
+            ctx.beginPath();
+            // Signature: void ctx.arc(x, y, radius, startAngle, endAngle [, anticlockwise]);
+            ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+            ctx.stroke()
+        }
+
+        function drawLine(ctx, line) {
+        	ctx.lineWidth   = line.lineWidth;
+            ctx.strokeStyle = 'black';
+            ctx.beginPath();
+            ctx.moveTo(line.startx, line.starty);
+            ctx.lineTo(line.endx, line.endy);
+            ctx.stroke();
+        }
+
+        function drawCircles(ctx) {
+            drawArc(ctx, innerCircle);
+            drawArc(ctx, outerCircle);
+        }
+
+        function drawLines(ctx, line, circle, rotation) {
+            for (x = 0; x < 12; x++) {
+                ctx.save();
+                ctx.translate(circle.x, circle.y)
+                ctx.rotate(rotation * Math.PI / 180);
+                drawLine(ctx, line);
+                ctx.restore();
+                rotation += 30;
+            }
+        }
+
+        function drawNumbers(ctx) {
+            var rotation = 195;
+
+            for (x = 0; x < 12; x++) {
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.save();
+                ctx.translate(innerCircle.x, innerCircle.y)
+                ctx.rotate(-rotation * Math.PI / 180);
+                ctx.translate(30, 0);
+                // We want the text to be rigth way up so unrotate
+                ctx.rotate(rotation * Math.PI / 180);
+                ctx.fillText((x + 1).toString(), 0, 0);
+                ctx.restore();
+                // Rotate to the next number position
+                rotation += 30;
+            }
+        }
+
+        function drawChart(ctx, rotation) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawCircles(ctx);
+    		drawLines(ctx, innerLine, innerCircle, 0);
+            drawLines(ctx, outerLine, outerCircle, rotation);
+            drawNumbers(ctx);
+            drawPlanets(ctx);
+            drawAspects(ctx);
+          }
+
+        function drawAspects(ctx) {
+            if (planetImgages.length == planetImageAttributes.length) {     // Only if all images are loaded
+                for (var i=0; i < planetImgages.length; i++) {
+                    for (var j=0; j < planetImgages.length; j++) {
+                        if (i != j) {   // Don't do it to yourself
+                             if ((planetImageAttributes[i].x != planetImageAttributes[i].startX || planetImageAttributes[i].y != planetImageAttributes[i].startY) &&
+                                 (planetImageAttributes[j].x != planetImageAttributes[j].startX || planetImageAttributes[j].y != planetImageAttributes[j].startY)) {
+                                 var line = {startx:    planetImageAttributes[i].x + planetImageAttributes[i].width / 2,
+                                             starty:    planetImageAttributes[i].y + planetImageAttributes[i].height / 2,
+                                             endx:      planetImageAttributes[j].x + planetImageAttributes[j].width / 2,
+                                             endy:      planetImageAttributes[j].y + planetImageAttributes[j].height / 2,
+                                             lineWidth: 1};
+                                drawLine(ctx, line);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawPlanets(ctx) {
+            if (planetImgages.length == planetImageAttributes.length) {     // Only if all images are loaded
+                for (var i=0; i < planetImgages.length; i++) {  
+                    ctx.drawImage(planetImgages[i],
+                                  planetImageAttributes[i].x,
+                                  planetImageAttributes[i].y,
+                                  planetImageAttributes[i].width,
+                                  planetImageAttributes[i].height)
+                }    
+            }
+        }
+
+        function loadPlanetImages(ctx) {
+            var img;
+            for (var i=0; i < planetImageAttributes.length; i++) {
+                img = new Image();
+                img.src = planetImageAttributes[i].name;
+                img.addEventListener('load', function() {
+                    planetImgages.push(this);
+                    drawPlanets(ctx);
+                }, false);
+            }
+        }
+
+        function isMouseOverObject(x, y, obj) {
+            return !(x < obj.x ||
+                x > obj.x + obj.width ||
+                y < obj.y ||
+                y > obj.y + obj.height);
+        }
+
+        function handleMouseDown(e) {
+            lastX = parseInt(e.clientX - offsetX);
+            lastY = parseInt(e.clientY - offsetY);
+
+            // Planet images take precidence because they might be on top of the chart and
+            // we don't want the chart to turn
+            for (var i = 0; i < planetImageAttributes.length; i++) {
+                if (isMouseOverObject(lastX, lastY, planetImageAttributes[i])) {
+                    draggingImage = planetImageAttributes[i]
+                }
+            }
+
+            var withinInnerCircle = false;
+            var withinOuterCircle = false;
+
+            var circle = innerCircle;
+            var dx = lastX - circle.x;
+            var dy = lastY - circle.y;
+            var rr = circle.radius * circle.radius;
+            if (dx * dx + dy * dy <= rr) {
+                withinInnerCircle = true;
+            }
+
+            circle = outerCircle;
+            var dx = lastX - circle.x;
+            var dy = lastY - circle.y;
+            var rr = circle.radius * circle.radius;
+            if (dx * dx + dy * dy <= rr) {
+                withinOuterCircle = true;
+            }
+
+            if (withinOuterCircle && !withinInnerCircle) {
+                if (!draggingImage) {
+                    isDraggingRing = true;
+                }
+            }
+        }
+
+        function handleMouseUp(e) {
+            isDraggingRing = false;
+            draggingImage = null
+            innerCircle.isDragging = false;
+            outerCircle.isDragging = false;
+        }
+
+        function handleMouseMove(e) {
+            if (!isDraggingRing && !draggingImage) {
+                return;
+            }
+
+            mouseX = parseInt(e.clientX - offsetX);
+            mouseY = parseInt(e.clientY - offsetY);
+            var dragLengthX = mouseX - lastX;
+            var dragLengthY = mouseY - lastY;
+            // for (var i = 0; i < circles.length; i++) {
+            //     var circle = circles[i]
+            //     if (circle.isDragging) {
+            //         //circle.x += dragLengthX;
+            //         //circle.y += dragLengthY;
+            //     }
+            // }
+            lastX = mouseX;
+            lastY = mouseY;
+
+            if (draggingImage) {
+                draggingImage.x = mouseX - draggingImage.width / 2;
+                draggingImage.y = mouseY - draggingImage.height / 2;
+            }
+
+            if (isDraggingRing) {
+                // Define the rotation of the outer lines
+                // var rotation = lastX;
+
+                // From Ss site
+                radians = Math.atan2(mouseX - centrex, mouseY - centrey),
+                currentAngleOfRingInDegrees = Math.round((radians * (180 / Math.PI) * -1) + 100);
+            }
+
+            // drawChart(ctx, outerCircle.rotation += dragLengthX);
+            drawChart(ctx, currentAngleOfRingInDegrees);
+        }
+
+        canvas.onmousedown = handleMouseDown;
+        canvas.onmouseup =   handleMouseUp;
+        canvas.onmousemove = handleMouseMove;
+
+        loadPlanetImages(ctx);
+        drawChart(ctx, 0);
+
+        </script>
+    </center>
+</html>
